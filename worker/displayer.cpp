@@ -79,9 +79,18 @@ void Displayer::CheckAndInitialize() {
 
   // init buffers
   uint32_t channel_count = container()->channel_count();
+  vec_fps_cals_.resize(channel_count);
   vec_image_buf_list_.resize(channel_count);
+  vec_objs_buf_list_.resize(channel_count);
+  vec_fps_buf_list_.resize(channel_count);
   vec_total_size_.resize(channel_count, 0);
   vec_erase_size_.resize(channel_count, 0);
+  vec_last_cal_bindex_.resize(channel_count, 0);
+  vec_last_update_bindex_.resize(channel_count, 0);
+  vec_fps_for_show_.resize(channel_count, 30);
+  for (auto &it : vec_fps_buf_list_) {
+      it.push_back(30);
+  }
   cache_frames_.resize(channel_count);
   for (int i = 0; i <  channel_count; ++i) {
     track_channels_.push_back(std::make_shared<MotFilter>());
@@ -128,6 +137,7 @@ void Displayer::Destroy() {
 namespace detection {
   extern std::vector<std::string> g_labels;
 }
+#include <QDebug>
 void Displayer::ThreadFunc(int buf_id) {
   // nn --->> neural network
   int nn_output_nm = inputs()[1]->tensor_descs().size();
@@ -135,6 +145,7 @@ void Displayer::ThreadFunc(int buf_id) {
     while (running()) {
       GetInputData img_getter(this, 0, buf_id);
       GetInputData nn_output_getter(this, 1, buf_id);
+      FpsCal fps_cal_t;
       auto image_tensor = img_getter.data(0);
       //  nn output tensors
       std::vector<std::shared_ptr<cnstream::Tensor>> nn_output_tensors;
@@ -173,6 +184,7 @@ void Displayer::ThreadFunc(int buf_id) {
         cv::Mat image_origin = matt.clone();
         auto image_after_postprocess = image_origin.clone();
         // post process
+        QVector<cv::Mat> objs;
         if (postcb_ != nullptr) {
           // get one batch shape for nn outputs.
           std::vector<mrtcxx::Shape> nn_shapes;
@@ -184,16 +196,52 @@ void Displayer::ThreadFunc(int buf_id) {
           DS_DetectObjects detect_objects;
           (*postcb_)(image_after_postprocess, detect_objects, nn_output_ptrs, nn_shapes);
           // track
-          TrackAndObjectOutput(image_origin, detect_objects, frame_id, channel_id);
+          objs = TrackAndObjectOutput(image_origin, detect_objects, frame_id, channel_id);
         }
         // update buffer
         vec_image_buf_list_[channel_id].push_back(std::move(image_after_postprocess));
+        vec_objs_buf_list_[channel_id].push_back(std::move(objs));
         vec_total_size_[channel_id]++;
       }
+      TempFps(channel_id);
+      qDebug() << "display fps:" << fps_cal_t.fps(batch_size);
     }
   } catch (cnstream::BufferStop& buf_stop) {
     DLOG(INFO) << "stopped";
   }
+}
+
+bool Displayer::CacheComplete()
+{
+    auto batch_size = inputs()[0]->tensor_descs()[0].shape().n();
+    for (auto it : vec_total_size_) {
+        if (it < 2 * batch_size) return false;
+    }
+    return true;
+}
+
+void Displayer::TempFps(int channel_id)
+{
+    auto batch_size = inputs()[0]->tensor_descs()[0].shape().n();
+    int last_bindex = vec_last_cal_bindex_[channel_id];
+    int now_bindex = vec_total_size_[channel_id] / batch_size;
+    if (now_bindex != last_bindex + kbstep_) return;
+    auto &fps_cal = vec_fps_cals_[channel_id];
+    auto fps = fps_cal.fps(batch_size * kbstep_);
+    vec_fps_buf_list_[channel_id].push_back(fps);
+    vec_last_cal_bindex_[channel_id] = now_bindex;
+}
+
+void Displayer::UpdateFps(int channel_id)
+{
+    auto batch_size = inputs()[0]->tensor_descs()[0].shape().n();
+    int last_bindex = vec_last_update_bindex_[channel_id];
+    int now_bindex = vec_erase_size_[channel_id] / batch_size;
+    if (last_bindex == now_bindex - kbstep_) {
+        vec_fps_for_show_[channel_id] = vec_fps_buf_list_[channel_id].front();
+        vec_fps_buf_list_[channel_id].pop_front();
+        vec_last_update_bindex_[channel_id] = now_bindex;
+    }
 }
 #include <chrono>
 #include <fstream>
@@ -215,60 +263,93 @@ class TimeCnter {
 };  // class TimeCnter
 
 void Displayer::HandleTimeOut() {
+  if (!CacheComplete()) return;
   // update image
     TimeCnter tcnter;
     tcnter.start();
   int chn_w = g_bw / 4, chn_h = g_bh / 8;
   int channel_nm = vec_image_buf_list_.size();
   // sync
-  for (int i = 0; i < channel_nm; ++i) {
-      if (vec_total_size_[i] == vec_erase_size_[i]) {
-          return;
-      }
-  }
+//  for (int i = 0; i < channel_nm; ++i) {
+//      if (vec_total_size_[i] == vec_erase_size_[i]) {
+//          return;
+//      }
+//  }
+  int total_fps = 0;
+  std::vector<int> working_ids;
   for (int i = 0 ; i < channel_nm; ++i) {
-//    if (vec_total_size_[i] == vec_erase_size_[i]) {
-//      // no image update in this channel
-//      // continue;
-//        return;
-//    }
-
-    std::function<void()> task = [this, chn_w, chn_h, i]() {
+    auto fps = vec_fps_for_show_[i];
+    total_fps += fps;
+    if (vec_total_size_[i] == vec_erase_size_[i]) {
+      // no image update in this channel
+       continue;
+    }
+    std::function<void()> task = [this, chn_w, chn_h, i, fps]() {
+        // get image from buffer list
         auto image = vec_image_buf_list_[i].front();
+        auto objs = vec_objs_buf_list_[i].front();
         vec_image_buf_list_[i].pop_front();
+        vec_objs_buf_list_[i].pop_front();
         vec_erase_size_[i]++;
+        UpdateFps(i);
+        // channel msg
+        auto text = "CHN-" + std::to_string(i + 1);
+        auto text_size = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 2, 2, nullptr);
+        cv::Point top_left;
+        top_left.x = (image.cols - text_size.width) / 2;
+        top_left.y = image.rows - text_size.height;
+        cv::putText(image, text, top_left,
+            cv::FONT_HERSHEY_SIMPLEX, 2,
+            CV_RGB(0, 255, 0), 2, 8, false);
         // selected
         if (i == selected_chn_) {
             cv::Mat rgb;
             cv::cvtColor(image, rgb, CV_BGR2RGB);
             emit worker_->sig_refresh_detail(rgb);
+            emit worker_->sig_refresh_obj(objs);
         }
         // copy to big image
         cv::Mat resize;
         cv::resize(image, resize, cv::Size(chn_w, chn_h));
+        // write fps
+        text = "FPS:" + std::to_string(fps);
+        cv::putText(resize, text, cv::Point(2, 20),
+            cv::FONT_HERSHEY_SIMPLEX, 0.5,
+            CV_RGB(0, 255, 0), 2, 8, false);
+
+        // copy to big image
         auto roi = big_img_(cv::Rect(chn_w * (i % 4), i / 4 * chn_h, chn_w, chn_h));
         resize.copyTo(roi);
     };
     g_image_worker[i].work(task);
+    working_ids.push_back(i);
   }
-  for (int i = 0; i < channel_nm; ++i) {
-      g_image_worker[i].sync();
+
+  for (auto & it : working_ids) {
+      g_image_worker[it].sync();
   }
+
+  // sync all worker
+//  for (int i = 0; i < channel_nm; ++i) {
+//      g_image_worker[i].sync();
+//  }
   tcnter.dot("copy to big image");
   cv::Mat rgb;
   cv::cvtColor(big_img_, rgb, CV_BGR2RGB);
   emit worker_->sig_refresh(rgb);
+  emit worker_->sig_refresh_fps(total_fps);
   tcnter.dot("bgr to rgb");
 }
 
 void Displayer::ChangeChn(int chn) {
     selected_chn_ = chn;
 }
-
-void Displayer::TrackAndObjectOutput(cv::Mat& image_origin, const DS_DetectObjects &detect_objects, const uint64_t &frame_id, const uint32_t &channel_id)
+#include <opencv2/highgui/highgui.hpp>
+QVector<cv::Mat> Displayer::TrackAndObjectOutput(cv::Mat& image_origin, const DS_DetectObjects &detect_objects, const uint64_t &frame_id, const uint32_t &channel_id)
 {
     auto pmot_filter = track_channels_[channel_id];
     std::vector<MotObject> shot_objects;
+    QVector<cv::Mat> objs;
     bool cache_frame;
     bool release_frame;
     uint64_t release_frame_id;
@@ -301,10 +382,13 @@ void Displayer::TrackAndObjectOutput(cv::Mat& image_origin, const DS_DetectObjec
         if(shot_object.y + shot_object.height > object_frame.rows) shot_object.height = object_frame.rows -shot_object.y;
         cv::Rect cut_rect(shot_object.x,shot_object.y,shot_object.width,shot_object.height);
         cv::Mat cut_img=object_frame(cut_rect);
-        std::string object_class = detection::g_labels[shot_object.class_id];
-        char msg[20];
-        snprintf(msg, sizeof(msg), "%s", object_class.c_str());
-        char *object_msg = msg;
+        cv::Mat cut_img_rgb;
+        cv::cvtColor(cut_img, cut_img_rgb, CV_BGR2RGB);
+        objs.push_back(cut_img_rgb);
+//        std::string object_class = detection::g_labels[shot_object.class_id];
+//        char msg[20];
+//        snprintf(msg, sizeof(msg), "%s", object_class.c_str());
+//        char *object_msg = msg;
         //TODO: objs
 //        if(objcb_ != nullptr)
 //        {
@@ -321,4 +405,5 @@ void Displayer::TrackAndObjectOutput(cv::Mat& image_origin, const DS_DetectObjec
             cache_frame_count_ --;
         }
     } //  if(release_frame)
+    return objs;
 }

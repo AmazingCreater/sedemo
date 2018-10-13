@@ -1,6 +1,7 @@
 #include <cmath>
 #include <opencv2/imgproc/imgproc.hpp>
 #include "ssd_pre_proc.h"
+#include "fpscal.h"
 
 using namespace cv;
 using namespace std;
@@ -17,7 +18,7 @@ shared_ptr<SsdPreProc> SsdPreProc::Create(const Inputs& inputs, int mean_values[
   shape.set_w(o_w);
   shape.set_h(o_h);
   tensor_descs[0].set_shape(shape);
-  auto con = make_shared<Connector>(inputs[0]->buf_count(), tensor_descs);
+  auto con = make_shared<Connector>(inputs[0]->buf_count(), tensor_descs, 3);
   return shared_ptr<SsdPreProc>(new SsdPreProc(inputs, {con}, mean_values));
 }
 
@@ -38,7 +39,7 @@ void SsdPreProc::Stop() {
     it.join();
   }
 }
-
+#include <QDebug>
 void SsdPreProc::ThreadFunc(int buf_id) {
   uint32_t batch_size = inputs()[0]->tensor_descs()[0].shape().n();
   auto o_dtype = outputs()[0]->tensor_descs()[0].dtype();
@@ -48,6 +49,7 @@ void SsdPreProc::ThreadFunc(int buf_id) {
     while(running()) {
       GetInputData input(this, 0, buf_id);
       GetOutputBuf output(this, 0, buf_id);
+      FpsCal fps_cal;
       auto in_tensor = input[0];
       auto out_tensor = output[0];
       // set stream attr
@@ -131,6 +133,7 @@ void SsdPreProc::ThreadFunc(int buf_id) {
         }
         cv::split(norm, aryMat);
       }
+      qDebug() << "preproc fps:" << fps_cal.fps(batch_size);
     }
   } catch (BufferStop& buf_stop) {
   }

@@ -20,8 +20,8 @@ class CnstreamWorker : public QObject {
   void sig_refresh(cv::Mat img);
   void sig_change_chn(int chn);
   void sig_refresh_detail(cv::Mat img);
-  void sig_refresh_obj(cv::Mat img, int id);
-
+  void sig_refresh_obj(QVector<cv::Mat> imgs);
+  void sig_refresh_fps(int fps);
  private:
   cnstream::Pipeline pipeline_;
 };  // class CnstreamWorker

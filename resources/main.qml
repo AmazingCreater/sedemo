@@ -81,23 +81,29 @@ ApplicationWindow {
        Text {
            id: txtFps
            text: qsTr("500FPS")
+           objectName: "fps_view"
            anchors.right: sysBtnGroup.left
            anchors.rightMargin: 50
            anchors.verticalCenter: parent.verticalCenter
            font.bold: true
            font.weight:Font.Bold
            color: "white"
+           Connections {
+               target: fps_updater
+               onSig_refresh_fps: {
+                   txtFps.text = "TOTAL FPS: " + fps;
+               }
+           }
        }
+
+
        SysBtnGroup {
             id: sysBtnGroup
             x: 1163
             y: 25
-
-
             anchors.right: parent.right
             anchors.rightMargin: 20
             anchors.verticalCenter: parent.verticalCenter
-
 
             onMin: mainwindiow.showMinimized()
             onClose: {
@@ -126,10 +132,10 @@ ApplicationWindow {
         anchors.left:parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-         color: "#060205"
+         color: "#19212e"
          Rectangle{
              id:rectChns
-             width: parent.width/2
+             width: parent.width/2.5
              height: parent.height
              color: "#19212e"
              border.width: 0
@@ -151,9 +157,18 @@ ApplicationWindow {
                  }
              }
          }
+         Rectangle {
+             id:border1
+             anchors.left: rectChns.right
+             anchors.top: parent.top
+             anchors.bottom:parent.bottom
+             width: 10
+             color:"transparent"
+         }
+
          Rectangle{
              id:rectContentRight
-             anchors.left: rectChns.right
+             anchors.left: border1.right
              anchors.top: parent.top
              anchors.bottom:parent.bottom
              anchors.right: parent.right
@@ -163,54 +178,158 @@ ApplicationWindow {
                  anchors.left: parent.left
                  anchors.right: parent.right
                  anchors.top: parent.top
-                 anchors.bottom: parent.bottom
-                 anchors.bottomMargin:300
+                 height: parent.height / 1.5
+
                  color: "transparent"
                  Image {
+                     anchors.left: parent.left
+                     anchors.right: parent.right
+                     anchors.top:  parent.top
+                     anchors.bottom: parent.bottom
+                     fillMode: Image.Stretch
+                     clip: true
                       id: imgDetail
                       cache: false
                  }
-                 Timer{
-                     //定时器触发时间 单位毫秒
-                     interval: 30;
-                     //触发定时器
-                     running: true;
-                     //不断重复
-                     repeat: true;
-                     //定时器触发时执行
-                     onTriggered: {
-                         imgDetail.source = "";
-                         imgDetail.source = "image://imageProvider/detail";
-                     }
-                 }
-
-//                 Connections {
-//                     target:picontrol
-//                     onRefreshImage:{
-//                         imgDetail.source = "image://imageProvider/detail"
-//                         imgDetail.update();
-//                     }
-//                 }
+             }
+             Rectangle {
+                 id:border2
+                 color:"transparent"
+                 anchors.left: parent.left
+                 anchors.right: parent.right
+                 anchors.top:rectQtAV.bottom
+                 height: 10
              }
              Rectangle{
                  id:rectSelectedDetail
                  color:"transparent"
                  anchors.left: parent.left
                  anchors.right: parent.right
-                 anchors.top:rectQtAV.bottom
+                 anchors.top:border2.bottom
                  anchors.bottom: parent.bottom
-//                 GridView{
-//                     id:grdSelctedDetail
-//                     model: 10
-//                     cellHeight: 100
-//                     cellWidth: 200
-//                     delegate:Image {
-//                             id: imgObjs
-//                             height: 100
-//                             width: 200
-//                             source: "images/car.jpg"
-//                     }
-//                 }
+                 Image {
+                      width: (parent.width - 3 * 5) / 4
+                      height: (parent.height - 10) / 2
+                      x: 0 * (5 + width)
+                      y: 0
+                      fillMode: Image.PreserveAspectFit
+                      clip: true
+                      id: obj0
+                      cache: false
+                 }
+                 Image {
+                     width: (parent.width - 3 * 5) / 4
+                     height: (parent.height - 10) / 2
+                     x: 1 * (5 + width)
+                     y: 0
+                      fillMode: Image.PreserveAspectFit
+                      clip: true
+                      id: obj1
+                      cache: false
+                 }
+                 Image {
+                     width: (parent.width - 3 * 5) / 4
+                     height: (parent.height - 10) / 2
+                     x: 2 * (5 + width)
+                     y: 0
+                      fillMode: Image.PreserveAspectFit
+                      clip: true
+                      id: obj2
+                      cache: false
+                 }
+                 Image {
+                     width: (parent.width - 3 * 5) / 4
+                     height: (parent.height - 10) / 2
+                     x: 3 * (5 + width)
+                     y: 0
+                     fillMode: Image.PreserveAspectFit
+                     clip: true
+                      id: obj3
+                      cache: false
+                 }
+                 Image {
+                     width: (parent.width - 3 * 5) / 4
+                     height: (parent.height - 10) / 2
+                     x: 0 * (5 + width)
+                     y: 5 + height
+                     fillMode: Image.PreserveAspectFit
+                     clip: true
+                      id: obj4
+                      cache: false
+                 }
+                 Image {
+                     width: (parent.width - 3 * 5) / 4
+                     height: (parent.height - 10) / 2
+                     x: 1 * (5 + width)
+                     y: 5 + height
+                     fillMode: Image.PreserveAspectFit
+                     clip: true
+                      id: obj5
+                      cache: false
+                 }
+                 Image {
+                     width: (parent.width - 3 * 5) / 4
+                     height: (parent.height - 10) / 2
+                     x: 2 * (5 + width)
+                     y: 5 + height
+                     fillMode: Image.PreserveAspectFit
+                     clip: true
+                      id: obj6
+                      cache: false
+                 }
+                 Image {
+                     width: (parent.width - 3 * 5) / 4
+                     height: (parent.height - 10) / 2
+                     x: 3 * (5 + width)
+                     y: 5 + height
+                     fillMode: Image.PreserveAspectFit
+                     clip: true
+                      id: obj7
+                      cache: false
+                 }
+                 Rectangle {
+                     height: 5
+                 }
+             }
+             Timer{
+                 //定时器触发时间 单位毫秒
+                 interval: 30;
+                 //触发定时器
+                 running: true;
+                 //不断重复
+                 repeat: true;
+                 //定时器触发时执行
+                 onTriggered: {
+                     imgDetail.source = "";
+                     imgDetail.source = "image://imageProvider/detail";
+                 }
+             }
+             Timer{
+                 //定时器触发时间 单位毫秒
+                 interval: 400;
+                 //触发定时器
+                 running: true;
+                 //不断重复
+                 repeat: true;
+                 //定时器触发时执行
+                 onTriggered: {
+                     obj0.source = "";
+                     obj0.source = "image://imageProvider/obj0";
+                     obj1.source = "";
+                     obj1.source = "image://imageProvider/obj1";
+                     obj2.source = "";
+                     obj2.source = "image://imageProvider/obj2";
+                     obj3.source = "";
+                     obj3.source = "image://imageProvider/obj3";
+                     obj4.source = "";
+                     obj4.source = "image://imageProvider/obj4";
+                     obj5.source = "";
+                     obj5.source = "image://imageProvider/obj5";
+                     obj6.source = "";
+                     obj6.source = "image://imageProvider/obj6";
+                     obj7.source = "";
+                     obj7.source = "image://imageProvider/obj7";
+                 }
              }
          }
 

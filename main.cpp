@@ -16,19 +16,21 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     qmlRegisterType<QVideoCapture>("CambriconControl", 1, 0, "VideoCapture");
     qRegisterMetaType<cv::Mat>("cv::Mat");
-
+    qRegisterMetaType<QVector<cv::Mat>>("QVector<cv::Mat>");
 
     QQmlApplicationEngine engine;
-    QPicProvider pic_provider;
-    engine.addImageProvider("imageProvider", &pic_provider);
+    auto *pic_provider = new QPicProvider;
+    engine.addImageProvider("imageProvider", pic_provider);
     engine.load(QUrl(QStringLiteral("qrc:/resources/main.qml")));
     if (engine.rootObjects().isEmpty()) {
         return -1;
     }
     CnstreamWorker worker;
+    engine.rootContext()->setContextProperty("fps_updater", &worker);
 
    QList<QObject*> aryRoots = engine.rootObjects();
    QVideoCapture* objVideoView = nullptr;
+
    if (aryRoots.size() > 0)
    {
        QObject* objRoot = aryRoots[0];
@@ -36,6 +38,7 @@ int main(int argc, char *argv[])
     {
         QObject* objItem = objRoot->findChild<QObject*>("videoView");
         objVideoView = qobject_cast<QVideoCapture*>(objItem);
+
         if (objVideoView == nullptr)  {
 
             return -1;
@@ -45,8 +48,8 @@ int main(int argc, char *argv[])
     }
    }
    QObject::connect(&engine, SIGNAL(quit()), &worker, SLOT(Stop()));
-   QObject::connect(&worker, SIGNAL(sig_refresh_detail(cv::Mat)), &pic_provider, SLOT(RefreshDetail(cv::Mat)));
-   QObject::connect(&worker, SIGNAL(sig_refresh_obj(cv::Mat, int)), &pic_provider, SLOT(RefreshObj(cv::Mat, int)));
+   QObject::connect(&worker, SIGNAL(sig_refresh_detail(cv::Mat)), pic_provider, SLOT(RefreshDetail(cv::Mat)));
+   QObject::connect(&worker, SIGNAL(sig_refresh_obj(QVector<cv::Mat>)), pic_provider, SLOT(RefreshObj(QVector<cv::Mat>)));
    worker.Start();
     return app.exec();
 }

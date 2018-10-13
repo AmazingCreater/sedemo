@@ -7,9 +7,11 @@
 #include "detection_post_proc.h"
 #include "displayer.h"
 #include "ssd_pre_proc.h"
+#include "swdecoder.h"
 
 void CnstreamWorker::Start() {
-  std::string video_path = "/home/dell/Desktop/cnstream-sedemo/resources/cars.mp4";
+  std::string video_path1 = "/home/dell/Desktop/cnstream-sedemo/resources/cars.mp4";
+  std::string video_path2 = "/home/dell/sample_720p.mp4";
   std::string model_path = "/home/dell/Desktop/resnet34ssd/resnet34ssd_fp16_sparse_optimized_70to80.cambricon";
   std::string label_path = "/home/dell/Desktop/cnstream-sedemo/resources/label_voc.txt";
   double threshold = 0.6;
@@ -22,13 +24,15 @@ void CnstreamWorker::Start() {
     batch_size = 1;
   }
   try {
-    // create decoder
+    // create hardware decoder
     cnstream::Decoder::Attr d_attr;
-    d_attr.src_frame_rate = 26;
-    d_attr.dst_frame_rate = 26;
-    d_attr.target_w = 1088;
-    d_attr.target_h = 720;
+    d_attr.src_frame_rate = 31;
+    d_attr.dst_frame_rate = 31;
+    d_attr.target_w = 720;
+    d_attr.target_h = 480;
     auto pdecoder = cnstream::Decoder::Create(d_attr, 2, batch_size);
+    // create software decoder
+//    auto pdecoder = SwDecoder::Create(batch_size, 1088, 720);
     // create pre proc
     int mean_value[3] = {104, 117, 123};
     auto ppre_proc = SsdPreProc::Create({pdecoder->outputs()[0]},
@@ -41,7 +45,7 @@ void CnstreamWorker::Start() {
         {mrtcxx::DataType::FLOAT32},
         {mrtcxx::NCHW}, {mrtcxx::NCHW}, mode);
     // create displayer
-    auto pdisplayer = Displayer::Create(26, &detection::SsdPostProc, this,
+    auto pdisplayer = Displayer::Create(30, &detection::SsdPostProc, this,
         {pdecoder->outputs()[1], pinferencer->outputs()[0]});
     // add module
     pipeline_.AddModule(pdecoder);
@@ -50,7 +54,10 @@ void CnstreamWorker::Start() {
     pipeline_.AddModule(pdisplayer);
     // add video
     for (int i = 0; i < nm_chn; ++i) {
-      pipeline_.AddVideo(video_path);
+        if (i % 2)
+            pipeline_.AddVideo(video_path1);
+        else
+            pipeline_.AddVideo(video_path2);
     }
     // init post proc
     detection::init(label_path, threshold);
@@ -61,6 +68,7 @@ void CnstreamWorker::Start() {
   } catch (cnstream::CnstreamError& e) {
     std::cerr << e.what() << std::endl;
   }
+
 }
 
 void CnstreamWorker::Stop() {

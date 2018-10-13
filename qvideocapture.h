@@ -19,6 +19,7 @@
 #include <QtQuick/QQuickItem>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <QTimer>
+#include <chrono>
 //class QVideoCaptureThread;
 class QVideoCapture : public QQuickItem{
 
@@ -39,11 +40,13 @@ public slots:
     void receiveFrames(cv::Mat objMat);
 Q_SIGNALS:
     void sig_change_chn(int chn);
+    void sig_update_fps(int fps);
 protected:
     virtual QSGNode *updatePaintNode(QSGNode *node, UpdatePaintNodeData *nodeData);
 
 private:
     void initializeMatSize();
+    void updateFps();
 
     QVideoCapture(const QVideoCapture& other);
     QVideoCapture& operator= (const QVideoCapture& other);
@@ -71,6 +74,7 @@ private:
 	QString totalFrameTime;
 	QString currentFrameTime;
 	int currentTaskType;
+    std::chrono::time_point<std::chrono::system_clock> m_start;
 
 };
 

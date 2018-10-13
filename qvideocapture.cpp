@@ -113,7 +113,7 @@ void QVideoCapture::setScreenBlack()
 
 void QVideoCapture::receiveFrames(cv::Mat objMat)
 {
-
+     updateFps();
      //cv::imwrite("/home/cc/123/"+std::to_string(xxx)+".jpg",*(objMat));
         if (imgIpl)
         {
@@ -158,4 +158,13 @@ void QVideoCapture::selectChns(int x, int y) {
     if (select_chn > 31) select_chn = 31;
     qDebug() << "selected: " << select_chn;
     emit sig_change_chn(select_chn);
+}
+
+void QVideoCapture::updateFps() {
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> delay = end - m_start;
+    int fps = static_cast<int>(1e3 / delay.count() * 32);
+    emit sig_update_fps(fps);
+    m_start = end;
+
 }

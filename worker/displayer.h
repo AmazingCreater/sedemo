@@ -10,6 +10,7 @@
 #include <cnstream/module.hpp>
 #include <deepsort/deepsort.h>
 #include "mot_filter.h"
+#include "fpscal.h"
 
 typedef void (*PostProcessing)(cv::Mat& img,
     DS_DetectObjects &detect_objects,
@@ -40,14 +41,24 @@ class Displayer : public QObject, public cnstream::Module {
  private:
   Displayer(const cnstream::Inputs &inputs, const cnstream::Outputs &outputs);
   void ThreadFunc(int buf_id);
-  void TrackAndObjectOutput(cv::Mat& image_origin, const DS_DetectObjects &detect_objects, const uint64_t &frame_id, const uint32_t &channel_id);
+  bool CacheComplete();
+  void UpdateFps(int channel_id);
+  void TempFps(int channel_id);
+  QVector<cv::Mat> TrackAndObjectOutput(cv::Mat& image_origin, const DS_DetectObjects &detect_objects, const uint64_t &frame_id, const uint32_t &channel_id);
   void DrawDetectResult(cv::Mat& image, DS_DetectObjects &detect_objects, const uint32_t &channel_id);
   QTimer timer_;
   QThread timer_th_;
   int frame_rate_;
+  const int kbstep_ = 8;
+  std::vector<FpsCal> vec_fps_cals_;
   std::vector<std::list<cv::Mat>> vec_image_buf_list_;
+  std::vector<std::list<QVector<cv::Mat>>> vec_objs_buf_list_;
+  std::vector<std::list<int>> vec_fps_buf_list_;
   std::vector<size_t> vec_total_size_;
   std::vector<size_t> vec_erase_size_;
+  std::vector<int> vec_last_cal_bindex_;
+  std::vector<int> vec_last_update_bindex_;
+  std::vector<int> vec_fps_for_show_;
   std::vector<std::shared_ptr<MotFilter>> track_channels_;
   std::vector<std::map<uint64_t, cv::Mat>> cache_frames_;
   int cache_frame_count_ = 0;

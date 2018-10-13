@@ -21,7 +21,9 @@ SOURCES += \
     worker/displayer.cpp \
     worker/mot_filter.cpp \
     worker/ssd_pre_proc.cpp \
-    QPicProvider.cpp
+    QPicProvider.cpp \
+    worker/swdecoder.cpp \
+    worker/fpscal.cpp
 
 RESOURCES += qml.qrc \
     qml.qrc
@@ -103,8 +105,11 @@ HEADERS += \
     worker/displayer.h \
     worker/mot_filter.h \
     worker/ssd_pre_proc.h \
-    QPicProvider.h
+    QPicProvider.h \
+    worker/swdecoder.h \
+    worker/fpscal.h
 
 INCLUDEPATH += $$PWD/dependencies/include
-LIBS += -L$$PWD/dependencies/lib/ -lcnstream -lcnrt -lcncodec -ldeepsort
 LIBS += -lopencv_core -lopencv_imgproc -lopencv_highgui -lglog
+LIBS += -L$$PWD/dependencies/lib/ -lcnstream -lcnrt -lcncodec -ldeepsort
+
