@@ -77,14 +77,24 @@ void MotFilter::Update(const DS_DetectObjects &frame_result,
 
     shot_objects.clear();
 
-    for (auto tracker_iter = objects_.begin(); tracker_iter != objects_.end();
-            tracker_iter++) {
-        if ((track_frame_id - tracker_iter->second.frame_id) > max_k_age_) {
-            // shot
-            shot_objects.push_back(tracker_iter->second);
-            objects_.erase(tracker_iter);
+//    for (auto tracker_iter = objects_.begin(); tracker_iter != objects_.end();
+//            tracker_iter++) {
+//        if ((track_frame_id - tracker_iter->second.frame_id) > max_k_age_) {
+//            // shot
+//            shot_objects.push_back(tracker_iter->second);
+//            objects_.erase(tracker_iter);
+//        }
+//    }
+
+        for (auto tracker_iter = objects_.begin(); tracker_iter != objects_.end();) {
+            if ((track_frame_id - tracker_iter->second.frame_id) > max_k_age_) {
+                // shot
+                shot_objects.push_back(tracker_iter->second);
+                tracker_iter = objects_.erase(tracker_iter);
+            } else {
+                tracker_iter++;
+            }
         }
-    }
 
     if (cache_frame) {
         cache_frames_.push_back(track_frame_id);

@@ -184,7 +184,7 @@ void Displayer::ThreadFunc(int buf_id) {
         cv::Mat image_origin = matt.clone();
         auto image_after_postprocess = image_origin.clone();
         // post process
-        QVector<cv::Mat> objs;
+        QVector<cv::Mat> objs(0);
         if (postcb_ != nullptr) {
           // get one batch shape for nn outputs.
           std::vector<mrtcxx::Shape> nn_shapes;
@@ -199,12 +199,12 @@ void Displayer::ThreadFunc(int buf_id) {
           objs = TrackAndObjectOutput(image_origin, detect_objects, frame_id, channel_id);
         }
         // update buffer
-        vec_image_buf_list_[channel_id].push_back(std::move(image_after_postprocess));
-        vec_objs_buf_list_[channel_id].push_back(std::move(objs));
+        std::unique_lock<std::mutex> lock(data_mutex_);
+        vec_image_buf_list_[channel_id].push_back(image_after_postprocess);
+        vec_objs_buf_list_[channel_id].push_back(objs);
         vec_total_size_[channel_id]++;
       }
       TempFps(channel_id);
-      qDebug() << "display fps:" << fps_cal_t.fps(batch_size);
     }
   } catch (cnstream::BufferStop& buf_stop) {
     DLOG(INFO) << "stopped";
@@ -263,7 +263,9 @@ class TimeCnter {
 };  // class TimeCnter
 
 void Displayer::HandleTimeOut() {
+
   if (!CacheComplete()) return;
+  std::unique_lock<std::mutex> lock(data_mutex_);
   // update image
     TimeCnter tcnter;
     tcnter.start();
@@ -325,9 +327,9 @@ void Displayer::HandleTimeOut() {
     working_ids.push_back(i);
   }
 
-  for (auto & it : working_ids) {
-      g_image_worker[it].sync();
-  }
+//  for (auto & it : working_ids) {
+//      g_image_worker[it].sync();
+//  }
 
   // sync all worker
 //  for (int i = 0; i < channel_nm; ++i) {

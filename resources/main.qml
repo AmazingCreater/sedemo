@@ -80,7 +80,7 @@ ApplicationWindow {
        }
        Text {
            id: txtFps
-           text: qsTr("500FPS")
+           text: qsTr("0FPS")
            objectName: "fps_view"
            anchors.right: sysBtnGroup.left
            anchors.rightMargin: 50

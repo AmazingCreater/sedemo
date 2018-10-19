@@ -3,17 +3,34 @@
  ***********************************************************************/
 #include <iostream>
 #include <string>
+#include <fstream>
 #include "cnstreamworker.h"
 #include "detection_post_proc.h"
 #include "displayer.h"
 #include "ssd_pre_proc.h"
 #include "swdecoder.h"
 
+std::vector<std::string> GetVideoList(std::string list_txt) {
+    std::vector<std::string> ret;
+    std::ifstream ifs(list_txt);
+    if (ifs.is_open()) {
+        int cnt = 32;
+        while(cnt--) {
+            std::string path;
+            ifs >> path;
+            ret.push_back(path);
+        }
+    }
+    return ret;
+}
+
 void CnstreamWorker::Start() {
-  std::string video_path1 = "/home/dell/Desktop/cnstream-sedemo/resources/cars.mp4";
-  std::string video_path2 = "/home/dell/sample_720p.mp4";
+//  std::string video_path1 = "/home/dell/Desktop/cnstream-sedemo/resources/cars.mp4";
+//  std::string video_path2 = "/home/dell/sample_720p.mp4";
   std::string model_path = "/home/dell/Desktop/resnet34ssd/resnet34ssd_fp16_sparse_optimized_70to80.cambricon";
   std::string label_path = "/home/dell/Desktop/cnstream-sedemo/resources/label_voc.txt";
+  std::string video_list = "/home/dell/Desktop/cnstream-sedemo/resources/video_list";
+  auto videos = GetVideoList(video_list);
   double threshold = 0.6;
   int nm_chn = 32;
   mrtcxx::MluMode mode = mrtcxx::MLU_MODE_UNION2;
@@ -53,11 +70,8 @@ void CnstreamWorker::Start() {
     pipeline_.AddModule(pinferencer);
     pipeline_.AddModule(pdisplayer);
     // add video
-    for (int i = 0; i < nm_chn; ++i) {
-        if (i % 2)
-            pipeline_.AddVideo(video_path1);
-        else
-            pipeline_.AddVideo(video_path2);
+    for (auto &it : videos) {
+        pipeline_.AddVideo(it);
     }
     // init post proc
     detection::init(label_path, threshold);

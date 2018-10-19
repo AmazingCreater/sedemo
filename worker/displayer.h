@@ -67,6 +67,7 @@ class Displayer : public QObject, public cnstream::Module {
   cv::Mat big_img_;
   int selected_chn_ = 0;
   CnstreamWorker *worker_;
+  std::mutex data_mutex_;
 };  // class Displayer
 #endif  // DISPLAYER_H_
 
